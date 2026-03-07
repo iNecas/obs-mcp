@@ -87,11 +87,13 @@ AUTH_MODE ?= kubeconfig
 .PHONY: run
 run: build ## Run obs-mcp in HTTP mode (use LOG_LEVEL=debug to see backend call timings)
 	@echo "Tip: Override backend URLs with PROMETHEUS_URL=https://... ALERTMANAGER_URL=https://... make run"
+	@echo "Note: AUTH_MODE=serviceaccount or header requires PROMETHEUS_URL and ALERTMANAGER_URL to be set"
 	./obs-mcp --listen $(LISTEN_ADDR) --auth-mode $(AUTH_MODE) --insecure --log-level $(LOG_LEVEL)
 
 .PHONY: run-no-guardrails
 run-no-guardrails: build ## Run obs-mcp in HTTP mode with guardrails disabled
 	@echo "Tip: Override backend URLs with PROMETHEUS_URL=https://... ALERTMANAGER_URL=https://... make run-no-guardrails"
+	@echo "Note: AUTH_MODE=serviceaccount or header requires PROMETHEUS_URL and ALERTMANAGER_URL to be set"
 	./obs-mcp --listen $(LISTEN_ADDR) --auth-mode $(AUTH_MODE) --insecure --log-level $(LOG_LEVEL) --guardrails none
 
 # E2E Testing
