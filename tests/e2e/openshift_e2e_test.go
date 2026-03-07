@@ -113,6 +113,8 @@ func TestRouteDiscovery_URLsAreReachable(t *testing.T) {
 // to OpenShift in-cluster monitoring and not an empty or misconfigured backend.
 // It checks for cluster_version, a metric that only exists in OpenShift monitoring
 // and is absent from Kind/kube-prometheus environments.
+// A failure here means PROMETHEUS_URL in the configmap is wrong or the server
+// fell back to localhost (which would fail to start since the last fix).
 func TestOpenShiftMetricsPresent(t *testing.T) {
 	resp, err := mcpClient.CallTool(t, 100, "list_metrics", map[string]any{
 		"name_regex": "cluster_version",

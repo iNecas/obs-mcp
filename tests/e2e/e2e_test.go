@@ -66,6 +66,25 @@ func TestHealthEndpoint(t *testing.T) {
 	}
 }
 
+// TestBackendNotLocalhost verifies that obs-mcp is connected to a real metrics
+// backend and not falling back to http://localhost:9090. A successful list_metrics
+// call returning known kube-prometheus metrics is proof of correct URL configuration.
+func TestBackendNotLocalhost(t *testing.T) {
+	resp, err := mcpClient.CallTool(t, 1, "list_metrics", map[string]any{
+		"name_regex": "prometheus_build_info",
+	})
+	if err != nil {
+		t.Fatalf("Failed to call list_metrics: %v", err)
+	}
+	if resp.Error != nil {
+		t.Fatalf("MCP error: %s -- is PROMETHEUS_URL set correctly in the deployment?", resp.Error.Message)
+	}
+	resultJSON, _ := json.Marshal(resp.Result)
+	if !strings.Contains(string(resultJSON), "prometheus_build_info") {
+		t.Error("prometheus_build_info not found -- server may be pointing at localhost:9090 instead of the configured backend")
+	}
+}
+
 func TestListMetricsReturnsKnownMetrics(t *testing.T) {
 	resp, err := mcpClient.CallTool(t, 2, "list_metrics", map[string]any{
 		"name_regex": ".*",
