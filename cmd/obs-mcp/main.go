@@ -134,7 +134,7 @@ func parseMetricsBackend(backend string) (k8s.MetricsBackend, error) {
 
 // determineMetricsBackendURL determines the metrics backend URL based on auth mode and environment.
 // Returns the resolved URL, a source description for logging, and an error if the configuration is invalid.
-func determineMetricsBackendURL(authMode mcp.AuthMode, backend k8s.MetricsBackend) (string, string, error) {
+func determineMetricsBackendURL(authMode mcp.AuthMode, backend k8s.MetricsBackend) (url, source string, err error) {
 	if prometheusURL := os.Getenv("PROMETHEUS_URL"); prometheusURL != "" {
 		return prometheusURL, "PROMETHEUS_URL env var", nil
 	}
@@ -160,7 +160,7 @@ func determineMetricsBackendURL(authMode mcp.AuthMode, backend k8s.MetricsBacken
 
 // determineAlertmanagerURL determines the Alertmanager URL based on auth mode and environment.
 // Returns the resolved URL, a source description for logging, and an error if the configuration is invalid.
-func determineAlertmanagerURL(authMode mcp.AuthMode) (string, string, error) {
+func determineAlertmanagerURL(authMode mcp.AuthMode) (url, source string, err error) {
 	if alertmanagerURL := os.Getenv("ALERTMANAGER_URL"); alertmanagerURL != "" {
 		return alertmanagerURL, "ALERTMANAGER_URL env var", nil
 	}
