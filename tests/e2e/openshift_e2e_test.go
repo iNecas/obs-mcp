@@ -6,11 +6,30 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 
+	"k8s.io/client-go/rest"
+
 	"github.com/rhobs/obs-mcp/pkg/k8s"
 )
+
+// authenticatedHTTPClient returns an HTTP client that sends the kubeconfig bearer
+// token on every request and skips TLS verification for OpenShift ingress certs.
+func authenticatedHTTPClient(t *testing.T) *http.Client {
+	t.Helper()
+	restConfig, err := k8s.GetClientConfig()
+	if err != nil {
+		t.Fatalf("Failed to get kubeconfig: %v", err)
+	}
+	restConfig.TLSClientConfig = rest.TLSClientConfig{Insecure: true} //nolint:gosec
+	rt, err := rest.TransportFor(restConfig)
+	if err != nil {
+		t.Fatalf("Failed to create authenticated transport: %v", err)
+	}
+	return &http.Client{Transport: rt}
+}
 
 // assertValidRouteURL checks that a discovered route URL is well-formed:
 // - parseable by net/url
@@ -72,23 +91,33 @@ func TestRouteDiscovery_Alertmanager(t *testing.T) {
 	t.Logf("Discovered Alertmanager URL: %s", discoveredURL)
 }
 
-// TestRouteDiscovery_URLsAreReachable verifies that the discovered route URLs
-// respond to HTTP requests. A 401/403 is acceptable -- it means the endpoint
-// exists and auth is enforced. Only connection failures are treated as errors.
+// TestRouteDiscovery_URLsAreReachable verifies that the discovered route URLs respond
+// with HTTP 200 when accessed with a valid bearer token against a real /api endpoint.
+// Routes only expose /api paths — hitting the bare URL returns 503 regardless of auth.
 func TestRouteDiscovery_URLsAreReachable(t *testing.T) {
 	tests := []struct {
-		name   string
-		getURL func() (string, error)
+		name    string
+		getURL  func() (string, error)
+		apiPath string
 	}{
 		{
-			name:   "thanos-querier",
-			getURL: func() (string, error) { return k8s.GetMetricsBackendURL(k8s.MetricsBackendThanos) },
+			name:    "thanos-querier",
+			getURL:  func() (string, error) { return k8s.GetMetricsBackendURL(k8s.MetricsBackendThanos) },
+			apiPath: "/api/v1/query?query=up",
 		},
 		{
-			name:   "alertmanager-main",
-			getURL: k8s.GetAlertmanagerURL,
+			name:    "prometheus-k8s",
+			getURL:  func() (string, error) { return k8s.GetMetricsBackendURL(k8s.MetricsBackendPrometheus) },
+			apiPath: "/api/v1/query?query=up",
+		},
+		{
+			name:    "alertmanager-main",
+			getURL:  k8s.GetAlertmanagerURL,
+			apiPath: "/api/v2/status",
 		},
 	}
+
+	client := authenticatedHTTPClient(t)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -98,26 +127,35 @@ func TestRouteDiscovery_URLsAreReachable(t *testing.T) {
 			}
 			assertValidRouteURL(t, rawURL)
 
-			resp, err := http.Get(rawURL) //nolint:noctx
+			apiURL := rawURL + tt.apiPath
+			resp, err := client.Get(apiURL) //nolint:noctx
 			if err != nil {
-				t.Fatalf("Route %s (%s) is not reachable: %v", tt.name, rawURL, err)
+				t.Fatalf("Route %s (%s) is not reachable: %v", tt.name, apiURL, err)
 			}
 			defer resp.Body.Close()
 
 			t.Logf("Route %s responded with HTTP %d", tt.name, resp.StatusCode)
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("Expected HTTP 200 from %s, got %d", apiURL, resp.StatusCode)
+			}
 		})
 	}
 }
 
-// TestOpenShiftMetricsPresent is a sanity test that confirms obs-mcp is wired
-// to OpenShift in-cluster monitoring and not an empty or misconfigured backend.
-// It checks for cluster_version, a metric that only exists in OpenShift monitoring
-// and is absent from Kind/kube-prometheus environments.
-// A failure here means PROMETHEUS_URL in the configmap is wrong or the server
-// fell back to localhost (which would fail to start since the last fix).
+// TestOpenShiftMetricsPresent verifies that obs-mcp can query an OpenShift-specific
+// metric, confirming it is wired to OpenShift in-cluster monitoring.
+// Skipped when OBS_MCP_URL is not set.
 func TestOpenShiftMetricsPresent(t *testing.T) {
-	resp, err := mcpClient.CallTool(t, 100, "list_metrics", map[string]any{
-		"name_regex": "cluster_version",
+	mcpURL := os.Getenv("OBS_MCP_URL")
+	if mcpURL == "" {
+		t.Skip("OBS_MCP_URL not set; skipping (set OBS_MCP_URL to run against a deployed or local obs-mcp)")
+	}
+
+	client := NewMCPClient(mcpURL)
+	const metric = "cluster_monitoring_operator_reconcile_attempts_total"
+
+	resp, err := client.CallTool(t, 1, "list_metrics", map[string]any{
+		"name_regex": metric,
 	})
 	if err != nil {
 		t.Fatalf("Failed to call list_metrics: %v", err)
@@ -125,10 +163,14 @@ func TestOpenShiftMetricsPresent(t *testing.T) {
 	if resp.Error != nil {
 		t.Fatalf("MCP error: %s", resp.Error.Message)
 	}
+	if isErr, ok := resp.Result["isError"].(bool); ok && isErr {
+		resultJSON, _ := json.Marshal(resp.Result)
+		t.Fatalf("list_metrics returned error: %s", string(resultJSON))
+	}
 
 	resultJSON, _ := json.Marshal(resp.Result)
-	if !strings.Contains(string(resultJSON), "cluster_version") {
-		t.Error("Expected OpenShift-specific metric 'cluster_version' not found -- is obs-mcp pointing at OpenShift monitoring?")
+	if !strings.Contains(string(resultJSON), metric) {
+		t.Fatalf("OpenShift-specific metric %q not found -- is obs-mcp pointing at OpenShift monitoring?\nResult: %s", metric, string(resultJSON))
 	}
-	t.Logf("OpenShift metric 'cluster_version' confirmed present")
+	t.Logf("OpenShift metric %q confirmed present", metric)
 }

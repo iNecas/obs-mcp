@@ -1,58 +1,13 @@
-//go:build e2e
+//go:build e2e && !openshift
 
 package e2e
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 	"testing"
 )
-
-var (
-	testConfig *TestConfig
-	mcpClient  *MCPClient
-)
-
-func TestMain(m *testing.M) {
-	// Set up signal handler for graceful shutdown on Ctrl+C
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-
-	go func() {
-		<-sigCh
-		fmt.Println("\nReceived interrupt signal, cleaning up...")
-		cancel()
-		if testConfig != nil {
-			testConfig.Cleanup()
-		}
-		os.Exit(130) // Standard exit code for SIGINT
-	}()
-
-	testConfig = NewTestConfig()
-	if err := testConfig.Setup(ctx); err != nil {
-		fmt.Printf("Failed to setup test environment: %v\n", err)
-		os.Exit(1)
-	}
-
-	mcpClient = NewMCPClient(testConfig.MCPURL)
-
-	// Run tests
-	code := m.Run()
-
-	// Cleanup
-	testConfig.Cleanup()
-
-	os.Exit(code)
-}
 
 func TestHealthEndpoint(t *testing.T) {
 	resp, err := http.Get(testConfig.MCPURL + "/health")
@@ -68,7 +23,7 @@ func TestHealthEndpoint(t *testing.T) {
 
 // TestBackendNotLocalhost verifies that obs-mcp is connected to a real metrics
 // backend and not falling back to http://localhost:9090. A successful list_metrics
-// call returning known kube-prometheus metrics is proof of correct URL configuration.
+// call returning known prometheus metrics is proof of correct URL configuration.
 func TestBackendNotLocalhost(t *testing.T) {
 	resp, err := mcpClient.CallTool(t, 1, "list_metrics", map[string]any{
 		"name_regex": "prometheus_build_info",
@@ -97,7 +52,7 @@ func TestListMetricsReturnsKnownMetrics(t *testing.T) {
 		t.Fatalf("MCP error: %s", resp.Error.Message)
 	}
 
-	// Verify known metrics from kube-prometheus are present
+	// Verify known metrics from prometheus are present
 	resultJSON, _ := json.Marshal(resp.Result)
 	resultStr := string(resultJSON)
 
@@ -121,7 +76,7 @@ func TestListMetricsReturnsKnownMetricsWithMatcher(t *testing.T) {
 		t.Fatalf("MCP error: %s", resp.Error.Message)
 	}
 
-	// Verify known metrics from kube-prometheus are present
+	// Verify known metrics from prometheus are present
 	resultJSON, _ := json.Marshal(resp.Result)
 	resultStr := string(resultJSON)
 
@@ -467,7 +422,7 @@ func TestGetAlertsWithFilter(t *testing.T) {
 		t.Error("Expected result, got nil")
 	}
 
-	// Verify Watchdog alert structure (kube-prometheus always has Watchdog firing)
+	// Verify Watchdog alert structure (prometheus always has Watchdog firing)
 	resultJSON, _ := json.Marshal(resp.Result)
 	resultStr := string(resultJSON)
 

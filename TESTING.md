@@ -1,24 +1,17 @@
 # Testing
 
-This document describes how to run tests for obs-mcp.
+This document describes how to run tests for obs-mcp. Run `make help` to see all available targets.
 
 ## Linting
 
 Run golangci-lint to check code quality:
 
 ```bash
-make lint
-```
-
-To automatically fix issues:
-
-```bash
-make lint-fix
+make lint        # check
+make lint-fix    # auto-fix
 ```
 
 ## Unit Tests
-
-Run unit tests with:
 
 ```bash
 make test-unit
@@ -26,133 +19,68 @@ make test-unit
 
 ## Manual Testing
 
-Use the Makefile run targets to start the server locally for manual testing with curl or an MCP client.
-
-### Start the server in HTTP mode
+**OpenShift** — auto-discovers Thanos/Alertmanager routes via kubeconfig:
 
 ```bash
-make run
+make run                       # kubeconfig auth, auto-discovers OpenShift Thanos route
+make run-no-guardrails         # same, with guardrails disabled (use for Thanos < v0.40.0)
 ```
 
-This builds the binary and starts the server on `:9100` with `kubeconfig` auth, debug logging, and TLS verification disabled. Override defaults as needed:
+**kube-prometheus or any other backend** — set URLs explicitly (auto-discovery requires OpenShift Routes):
 
 ```bash
-LISTEN_ADDR=:8080 AUTH_MODE=header LOG_LEVEL=info make run
+PROMETHEUS_URL=http://localhost:9090 ALERTMANAGER_URL=http://localhost:9093 make run
 ```
 
-To point at a specific Prometheus/Alertmanager instance:
+Override other defaults as needed:
 
 ```bash
-PROMETHEUS_URL=https://thanos.example.com ALERTMANAGER_URL=https://alertmanager.example.com make run
+LISTEN_ADDR=:8080 LOG_LEVEL=info make run
 ```
 
-### Start the server with guardrails disabled
+## Kind-based E2E Tests
 
-Useful when testing against Thanos versions before v0.40.0 (which don't expose `/api/v1/status/tsdb`):
+Tests obs-mcp against a local Kind cluster with kube-prometheus.
 
 ```bash
-make run-no-guardrails
+make test-e2e-full          # setup + deploy + test + teardown in one command
 ```
 
-### Structured log output
-
-With `LOG_LEVEL=debug` (the default for make targets), every backend API call logs timing and result information:
+Or step by step:
 
 ```bash
-level=debug msg="Backend call completed" backend=prometheus operation=list_metrics duration_ms=42 result_count=1523
-level=warn msg="Guardrail rejected query" guardrail=disallow-blanket-regex query="up{job=~\".+\"}" error="..."
-```
-
-This is useful for spotting slow backend calls, guardrail rejections, and backend errors without any additional tooling.
-
-## End-to-End (E2E) Tests
-
-E2E tests validate obs-mcp against a real Kubernetes cluster with Prometheus.
-
-### Prerequisites
-
-- [Go](https://golang.org/dl/) 1.24+
-- [Docker](https://docs.docker.com/get-docker/) or [Podman](https://podman.io/)
-- [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
-- [kubectl](https://kubernetes.io/docs/tasks/tools/)
-
-### Running E2E Tests
-
-**To use Podman instead of Docker, export the following:**
-
-```bash
-export CONTAINER_CLI=podman
-```
-
-#### Full Test Cycle
-
-Run setup, deploy, test, and teardown in one command:
-
-```bash
-make test-e2e-full
-```
-
-#### Step-by-Step (Recommended for Development)
-
-1. **Setup Kind cluster with kube-prometheus:**
-
-```bash
-make test-e2e-setup
-```
-
-This creates a Kind cluster and installs Prometheus Operator, Prometheus, and Alertmanager.
-
-2. **Build and deploy obs-mcp:**
-
-```bash
-make test-e2e-deploy
-```
-
-3. **Run E2E tests:**
-
-```bash
-make test-e2e
-```
-
-4. **Teardown (when done):**
-
-```bash
-make test-e2e-teardown
+make test-e2e-setup         # create Kind cluster
+make test-e2e-deploy        # build and deploy obs-mcp
+make test-e2e               # run tests
+make test-e2e-teardown      # cleanup
 ```
 
 ## OpenShift E2E Tests
 
-OpenShift-specific tests run against real OpenShift in-cluster monitoring. They use the `e2e,openshift` build tags and are kept separate from the Kind-based tests.
+Validates route auto-discovery (`pkg/k8s`) and tool correctness against OpenShift monitoring.
 
-### What is tested
+`TestRouteDiscovery_*` exercises `pkg/k8s` directly using the kubeconfig — no running obs-mcp needed.
+`TestOpenShiftMetricsPresent` requires `OBS_MCP_URL` and is skipped when not set. In CI, `OBS_MCP_URL` is set automatically by the step registry to point at the deployed obs-mcp instance.
 
-| Test | Description |
-|------|-------------|
-| `TestRouteDiscovery_ThanosQuerier` | Discovers `thanos-querier` route in `openshift-monitoring` |
-| `TestRouteDiscovery_PrometheusK8s` | Discovers `prometheus-k8s` route in `openshift-monitoring` |
-| `TestRouteDiscovery_Alertmanager` | Discovers `alertmanager-main` route in `openshift-monitoring` |
-| `TestRouteDiscovery_URLsAreReachable` | Verifies discovered URLs respond to HTTP requests (401 is acceptable) |
-| `TestOpenShiftMetricsPresent` | Confirms `cluster_version` metric is reachable through obs-mcp (OpenShift-only metric) |
+### Route discovery only
 
-General tool correctness (instant query, range query, alerts, guardrails) is covered by the Kind-based `make test-e2e` suite and is not duplicated here.
-
-### Running locally
-
-The simplest local setup — no deployment needed:
+Verifies route auto-discovery, URL shape, and that each route responds HTTP 200 when accessed with the kubeconfig bearer token against a real `/api` endpoint.
 
 ```bash
-oc login                              # log into your OpenShift cluster
-make run                              # starts server at :9100, auto-discovers Thanos/Prometheus via kubeconfig
-OBS_MCP_URL=http://localhost:9100 make test-e2e-openshift
+make test-e2e-openshift
 ```
 
-`TestRouteDiscovery_*` tests call `pkg/k8s` directly and don't need the server at all. Only `TestOpenShiftMetricsPresent` requires a running server.
+### Full suite including MCP tool smoke tests
 
-### Running in CI
-
-In CI, obs-mcp is deployed to the cluster first (`serviceaccount` auth mode) and then tests run against it:
+Start obs-mcp in one terminal, then run the tests in another:
 
 ```bash
-IMAGE=<image> make test-e2e-openshift-deploy   # deploy to cluster (CI sets IMAGE automatically)
-make test-e2e-openshift                         # run tests via port-forward
+make run   # auto-discovers Thanos/Alertmanager routes via kubeconfig bearer token
 ```
+
+```bash
+OBS_MCP_URL=http://localhost:9100 make test-e2e-openshift   # OpenShift route discovery + metrics
+OBS_MCP_URL=http://localhost:9100 make test-e2e             # full MCP tool smoke tests
+```
+
+> Note: `make test-e2e` without `OBS_MCP_URL` will attempt a port-forward to a Kind/k8s cluster. It will fail if no `obs-mcp` pod is running in the `obs-mcp` namespace.

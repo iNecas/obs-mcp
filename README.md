@@ -14,8 +14,6 @@ obs-mcp is a [mcp](https://modelcontextprotocol.io/introduction) server to allow
 
 Run `make help` to see all available commands.
 
-
-
 ### 1. Using Kubeconfig (OpenShift)
 
 The easiest way to get the obs-mcp connected to the cluster is via a kubeconfig:
@@ -82,21 +80,11 @@ go run ./cmd/obs-mcp/ --listen 127.0.0.1:9100 --auth-mode kubeconfig --metrics-b
 
 ### 2. Port-forwarding alternative
 
-This scenario opens a local port via port-forward that the obs-mcp will connect to:
+Port-forwards `prometheus-k8s-0:9090` to localhost and starts obs-mcp with header auth, bypassing the OAuth proxy. Requires `oc login`:
 
- 1. Log into your OpenShift cluster
-
- 2. Port forward the OpenShift in-cluster Prometheus service to a local port
-
-  ```shell
-  kubectl port-forward -n openshift-monitoring svc/prometheus-operated 9090:9090
-  ```
-
-  Run the server with:
-
-  ```shell
-  AUTH_MODE=header make run
-  ```
+```shell
+make run-openshift-prometheus
+```
 
 ### 3. Local Development with Kind (using E2E test infrastructure)
 

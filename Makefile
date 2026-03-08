@@ -90,6 +90,15 @@ run: build ## Run obs-mcp in HTTP mode (use LOG_LEVEL=debug to see backend call 
 	@echo "Note: AUTH_MODE=serviceaccount or header requires PROMETHEUS_URL and ALERTMANAGER_URL to be set"
 	./obs-mcp --listen $(LISTEN_ADDR) --auth-mode $(AUTH_MODE) --insecure --log-level $(LOG_LEVEL)
 
+.PHONY: run-openshift-prometheus
+run-openshift-prometheus: build ## Port-forward prometheus-k8s-0:9090 and start obs-mcp with header auth (requires oc login)
+	@echo "Port-forwarding prometheus-k8s-0:9090 and starting obs-mcp..."
+	@oc port-forward -n openshift-monitoring pod/prometheus-k8s-0 9090:9090 & \
+		PF_PID=$$!; \
+		sleep 2; \
+		trap "kill $$PF_PID 2>/dev/null" EXIT; \
+		PROMETHEUS_URL=http://localhost:9090 ./obs-mcp --listen $(LISTEN_ADDR) --auth-mode header --log-level $(LOG_LEVEL)
+
 .PHONY: run-no-guardrails
 run-no-guardrails: build ## Run obs-mcp in HTTP mode with guardrails disabled
 	@echo "Tip: Override backend URLs with PROMETHEUS_URL=https://... ALERTMANAGER_URL=https://... make run-no-guardrails"
@@ -145,6 +154,6 @@ test-e2e-openshift-deploy: ## Deploy obs-mcp to OpenShift (uses IMAGE env var fr
 	oc -n obs-mcp rollout status deployment/obs-mcp --timeout=3m
 
 .PHONY: test-e2e-openshift
-test-e2e-openshift: ## Run OpenShift-specific E2E tests (route discovery + tool smoke tests, requires oc login and deployed obs-mcp)
-	@echo "Running OpenShift E2E tests (requires active oc login and deployed obs-mcp)"
-	go test -mod=mod -v -tags=e2e,openshift -timeout=10m ./tests/e2e/...
+test-e2e-openshift: ## Run OpenShift route discovery E2E tests (requires oc login)
+	go test -mod=mod -v -tags=e2e,openshift -timeout=5m ./tests/e2e/...
+
