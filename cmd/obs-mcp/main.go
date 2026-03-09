@@ -50,11 +50,11 @@ func main() {
 		log.Fatalf("Invalid metrics backend: %v", err)
 	}
 
-	// Warn if --metrics-backend was explicitly set but will be ignored.
-	// Route discovery (which honours this flag) only runs in kubeconfig mode.
+	// --metrics-backend only controls route discovery in kubeconfig mode.
+	// Fail fast if it's set in any other mode to avoid silent misconfiguration.
 	if parsedAuthMode != mcp.AuthModeKubeConfig && isFlagExplicitlySet("metrics-backend") {
-		slog.Warn("--metrics-backend flag has no effect outside kubeconfig mode; set PROMETHEUS_URL to point at your Thanos/Prometheus instance",
-			"auth_mode", parsedAuthMode, "metrics_backend", *metricsBackend)
+		log.Fatalf("--metrics-backend has no effect with --auth-mode %s; "+
+			"set PROMETHEUS_URL to point at your Thanos/Prometheus instance instead", parsedAuthMode)
 	}
 
 	// Determine metrics backend URL - pass the backend type
