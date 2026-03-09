@@ -169,7 +169,7 @@ func (g *Guardrails) IsSafeQuery(ctx context.Context, query string, client v1.AP
 			if err != nil {
 				return false, fmt.Errorf(
 					"cannot enforce max-metric-cardinality guardrail: TSDB stats endpoint is unavailable on this backend "+
-						"(e.g. Thanos Querier does not implement /api/v1/status/tsdb); "+
+						"(Thanos Querier < v0.40.0 does not implement /api/v1/status/tsdb); "+
 						"disable this guardrail with --guardrails require-label-matcher,disallow-blanket-regex: %w", err)
 			}
 
@@ -212,7 +212,7 @@ func (g *Guardrails) IsSafeQuery(ctx context.Context, query string, client v1.AP
 			if err != nil {
 				return false, fmt.Errorf(
 					"cannot enforce max-label-cardinality guardrail: TSDB stats endpoint is unavailable on this backend "+
-						"(e.g. Thanos Querier does not implement /api/v1/status/tsdb); "+
+						"(Thanos Querier < v0.40.0 does not implement /api/v1/status/tsdb); "+
 						"disable this guardrail with --guardrails require-label-matcher,disallow-blanket-regex: %w", err)
 			}
 
