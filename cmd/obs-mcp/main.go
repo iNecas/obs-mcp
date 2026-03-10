@@ -50,11 +50,24 @@ func main() {
 		log.Fatalf("Invalid metrics backend: %v", err)
 	}
 
+	// --metrics-backend only controls route discovery in kubeconfig mode.
+	// Fail fast if it's set in any other mode to avoid silent misconfiguration.
+	if parsedAuthMode != mcp.AuthModeKubeConfig && isFlagExplicitlySet("metrics-backend") {
+		log.Fatalf("--metrics-backend has no effect with --auth-mode %s; "+
+			"set PROMETHEUS_URL to point at your Thanos/Prometheus instance instead", parsedAuthMode)
+	}
+
 	// Determine metrics backend URL - pass the backend type
-	metricsBackendURL := determineMetricsBackendURL(parsedAuthMode, parsedMetricsBackend)
+	metricsBackendURL, metricsURLSource, err := determineMetricsBackendURL(parsedAuthMode, parsedMetricsBackend)
+	if err != nil {
+		log.Fatalf("%v", err)
+	}
 
 	// Determine Alertmanager URL
-	alertmanagerURL := determineAlertmanagerURL(parsedAuthMode)
+	alertmanagerURL, alertmanagerURLSource, err := determineAlertmanagerURL(parsedAuthMode)
+	if err != nil {
+		log.Fatalf("%v", err)
+	}
 
 	// Parse guardrails configuration
 	parsedGuardrails, err := prometheus.ParseGuardrails(*guardrails)
@@ -83,7 +96,14 @@ func main() {
 		log.Fatalf("Failed to create MCP server: %v", err)
 	}
 
-	slog.Info("Starting server", "MetricsBackendURL", opts.MetricsBackendURL, "AlertmanagerURL", opts.AlertmanagerURL, "AuthMode", opts.AuthMode, "Guardrails", opts.Guardrails)
+	slog.Info("Starting server",
+		"auth_mode", opts.AuthMode,
+		"metrics_backend_url", opts.MetricsBackendURL,
+		"metrics_backend_url_source", metricsURLSource,
+		"alertmanager_url", opts.AlertmanagerURL,
+		"alertmanager_url_source", alertmanagerURLSource,
+		"guardrails", opts.Guardrails,
+	)
 
 	// Choose server mode based on flags
 	if *listen != "" {
@@ -113,59 +133,65 @@ func parseMetricsBackend(backend string) (k8s.MetricsBackend, error) {
 }
 
 // determineMetricsBackendURL determines the metrics backend URL based on auth mode and environment.
-func determineMetricsBackendURL(authMode mcp.AuthMode, backend k8s.MetricsBackend) string {
-	// Get metrics backend URL from environment variable PROMETHEUS_URL
-	prometheusURL := os.Getenv("PROMETHEUS_URL")
-
-	// If URL is provided, use it
-	if prometheusURL != "" {
-		return prometheusURL
+// Returns the resolved URL, a source description for logging, and an error if the configuration is invalid.
+func determineMetricsBackendURL(authMode mcp.AuthMode, backend k8s.MetricsBackend) (url, source string, err error) {
+	if prometheusURL := os.Getenv("PROMETHEUS_URL"); prometheusURL != "" {
+		return prometheusURL, "PROMETHEUS_URL env var", nil
 	}
 
-	// For kubeconfig mode, attempt to discover route based on selected backend
 	if authMode == mcp.AuthModeKubeConfig {
-		slog.Info("No metrics backend URL provided, attempting to discover via kubeconfig", "backend", backend)
-
+		slog.Info("No PROMETHEUS_URL set, attempting route discovery", "backend", backend)
 		url, err := k8s.GetMetricsBackendURL(backend)
 		if err != nil {
-			slog.Warn("Failed to discover metrics backend via kubeconfig", "err", err, "fallback_url", defaultPrometheusURL)
-			return defaultPrometheusURL
+			slog.Warn("Route discovery failed, falling back to default", "err", err, "default", defaultPrometheusURL)
+			return defaultPrometheusURL, "default (route discovery failed)", nil
 		}
-
-		slog.Info("Discovered metrics backend URL", "url", url)
-		return url
+		return url, "route discovery", nil
 	}
 
-	// Default to localhost for all other auth modes
-	return defaultPrometheusURL
+	// serviceaccount and header modes are designed for deployments where the URL
+	// is always known ahead of time. Falling back to localhost is never correct.
+	return "", "", fmt.Errorf(
+		"PROMETHEUS_URL must be set when using --auth-mode %s\n"+
+			"  Set it via environment variable or use --auth-mode kubeconfig for auto-discovery",
+		authMode,
+	)
 }
 
 // determineAlertmanagerURL determines the Alertmanager URL based on auth mode and environment.
-func determineAlertmanagerURL(authMode mcp.AuthMode) string {
-	// Get Alertmanager URL from environment variable ALERTMANAGER_URL
-	alertmanagerURL := os.Getenv("ALERTMANAGER_URL")
-
-	// If URL is provided, use it
-	if alertmanagerURL != "" {
-		return alertmanagerURL
+// Returns the resolved URL, a source description for logging, and an error if the configuration is invalid.
+func determineAlertmanagerURL(authMode mcp.AuthMode) (url, source string, err error) {
+	if alertmanagerURL := os.Getenv("ALERTMANAGER_URL"); alertmanagerURL != "" {
+		return alertmanagerURL, "ALERTMANAGER_URL env var", nil
 	}
 
-	// For kubeconfig mode, attempt to discover route
 	if authMode == mcp.AuthModeKubeConfig {
-		slog.Info("No Alertmanager URL provided, attempting to discover via kubeconfig")
-
+		slog.Info("No ALERTMANAGER_URL set, attempting route discovery")
 		url, err := k8s.GetAlertmanagerURL()
 		if err != nil {
-			slog.Warn("Failed to discover Alertmanager via kubeconfig", "err", err, "fallback_url", defaultAlertmanagerURL)
-			return defaultAlertmanagerURL
+			slog.Warn("Route discovery failed, falling back to default", "err", err, "default", defaultAlertmanagerURL)
+			return defaultAlertmanagerURL, "default (route discovery failed)", nil
 		}
-
-		slog.Info("Discovered Alertmanager URL", "url", url)
-		return url
+		return url, "route discovery", nil
 	}
 
-	// Default to localhost for all other auth modes
-	return defaultAlertmanagerURL
+	return "", "", fmt.Errorf(
+		"ALERTMANAGER_URL must be set when using --auth-mode %s\n"+
+			"  Set it via environment variable or use --auth-mode kubeconfig for auto-discovery",
+		authMode,
+	)
+}
+
+// isFlagExplicitlySet reports whether the named flag was explicitly provided on
+// the command line (as opposed to relying on its default value).
+func isFlagExplicitlySet(name string) bool {
+	found := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			found = true
+		}
+	})
+	return found
 }
 
 // configureLogging sets up the slog logger with the specified log level

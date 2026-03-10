@@ -56,13 +56,14 @@ When deploying in-cluster, you must configure:
 
 The metrics backend URL is determined in the following order:
 
-1. `PROMETHEUS_URL` environment variable (if set, always used)
-2. `--metrics-backend` flag route discovery (only in `kubeconfig` mode)
-3. Default: `http://localhost:9090`
+1. `PROMETHEUS_URL` environment variable (if set, always used regardless of auth mode)
+2. Route discovery via the OpenShift Route API (only in `kubeconfig` mode, respects `--metrics-backend`)
+3. Fatal error — `serviceaccount` and `header` modes require `PROMETHEUS_URL` to be set explicitly
 
 > [!NOTE]
 >
-> Auto-discovery only works in `kubeconfig` mode. For in-cluster deployments, you must set `PROMETHEUS_URL` explicitly.
+> Auto-discovery only works in `kubeconfig` mode. For `serviceaccount` and `header` modes, the server
+> will fail at startup if `PROMETHEUS_URL` is not set. The same applies to `ALERTMANAGER_URL`.
 
 ### Guardrails and Thanos Compatibility
 
