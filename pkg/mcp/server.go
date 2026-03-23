@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mark3labs/mcp-go/server"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/rhobs/obs-mcp/pkg/prometheus"
 	"github.com/rhobs/obs-mcp/pkg/tools"
@@ -35,14 +35,17 @@ const (
 	defaultShutdownTimeout = 10 * time.Second
 )
 
-func NewMCPServer(opts ObsMCPOptions) (*server.MCPServer, error) {
-	mcpServer := server.NewMCPServer(
-		serverName,
-		serverVersion,
-		server.WithLogging(),
-		server.WithToolCapabilities(true),
-		server.WithInstructions(tools.ServerPrompt),
-	)
+func NewMCPServer(opts ObsMCPOptions) (*mcp.Server, error) {
+	impl := &mcp.Implementation{
+		Name:    serverName,
+		Version: serverVersion,
+	}
+
+	serverOpts := &mcp.ServerOptions{
+		Instructions: tools.ServerPrompt,
+	}
+
+	mcpServer := mcp.NewServer(impl, serverOpts)
 
 	if err := SetupTools(mcpServer, opts); err != nil {
 		return nil, err
@@ -51,37 +54,15 @@ func NewMCPServer(opts ObsMCPOptions) (*server.MCPServer, error) {
 	return mcpServer, nil
 }
 
-func SetupTools(mcpServer *server.MCPServer, opts ObsMCPOptions) error {
-	// Create tool definitions
-	listMetricsTool := CreateListMetricsTool()
-	executeInstantQueryTool := CreateExecuteInstantQueryTool()
-	executeRangeQueryTool := CreateExecuteRangeQueryTool()
-	getLabelNamesTool := CreateGetLabelNamesTool()
-	getLabelValuesTool := CreateGetLabelValuesTool()
-	getSeriesTool := CreateGetSeriesTool()
-	getAlertsTool := CreateGetAlertsTool()
-	getSilencesTool := CreateGetSilencesTool()
-
-	// Create handlers
-	listMetricsHandler := ListMetricsHandler(opts)
-	executeInstantQueryHandler := ExecuteInstantQueryHandler(opts)
-	executeRangeQueryHandler := ExecuteRangeQueryHandler(opts)
-	getLabelNamesHandler := GetLabelNamesHandler(opts)
-	getLabelValuesHandler := GetLabelValuesHandler(opts)
-	getSeriesHandler := GetSeriesHandler(opts)
-	getAlertsHandler := GetAlertsHandler(opts)
-	getSilencesHandler := GetSilencesHandler(opts)
-
-	// Add tools to server
-	mcpServer.AddTool(listMetricsTool, listMetricsHandler)
-	mcpServer.AddTool(executeInstantQueryTool, executeInstantQueryHandler)
-	mcpServer.AddTool(executeRangeQueryTool, executeRangeQueryHandler)
-	mcpServer.AddTool(getLabelNamesTool, getLabelNamesHandler)
-	mcpServer.AddTool(getLabelValuesTool, getLabelValuesHandler)
-	mcpServer.AddTool(getSeriesTool, getSeriesHandler)
-	mcpServer.AddTool(getAlertsTool, getAlertsHandler)
-	mcpServer.AddTool(getSilencesTool, getSilencesHandler)
-
+func SetupTools(mcpServer *mcp.Server, opts ObsMCPOptions) error {
+	mcp.AddTool(mcpServer, tools.ListMetrics.ToMCPTool(), ListMetricsHandler(opts))
+	mcp.AddTool(mcpServer, tools.ExecuteInstantQuery.ToMCPTool(), ExecuteInstantQueryHandler(opts))
+	mcp.AddTool(mcpServer, tools.ExecuteRangeQuery.ToMCPTool(), ExecuteRangeQueryHandler(opts))
+	mcp.AddTool(mcpServer, tools.GetLabelNames.ToMCPTool(), GetLabelNamesHandler(opts))
+	mcp.AddTool(mcpServer, tools.GetLabelValues.ToMCPTool(), GetLabelValuesHandler(opts))
+	mcp.AddTool(mcpServer, tools.GetSeries.ToMCPTool(), GetSeriesHandler(opts))
+	mcp.AddTool(mcpServer, tools.GetAlerts.ToMCPTool(), GetAlertsHandler(opts))
+	mcp.AddTool(mcpServer, tools.GetSilences.ToMCPTool(), GetSilencesHandler(opts))
 	return nil
 }
 
@@ -105,7 +86,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func Serve(ctx context.Context, mcpServer *server.MCPServer, listenAddr string) error {
+func Serve(ctx context.Context, mcpServer *mcp.Server, listenAddr string) error {
 	mux := http.NewServeMux()
 
 	httpServer := &http.Server{
@@ -113,14 +94,15 @@ func Serve(ctx context.Context, mcpServer *server.MCPServer, listenAddr string) 
 		Handler: loggingMiddleware(mux),
 	}
 
-	streamableHTTPServer := server.NewStreamableHTTPServer(mcpServer,
-		server.WithStreamableHTTPServer(httpServer),
-		server.WithStateLess(true),
-		server.WithHTTPContextFunc(authFromRequest),
-	)
-	mux.Handle(mcpEndpoint, streamableHTTPServer)
+	opts := &mcp.StreamableHTTPOptions{
+		Stateless: true,
+	}
 
-	mux.Handle("/", streamableHTTPServer)
+	streamableHandler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
+		return mcpServer
+	}, opts)
+	mux.Handle(mcpEndpoint, streamableHandler)
+	mux.Handle("/", streamableHandler)
 
 	mux.HandleFunc(healthEndpoint, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
