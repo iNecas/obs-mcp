@@ -113,6 +113,9 @@ run-openshift-pf-prometheus: build pf-alertmanager ## Port-forward prometheus-k8
 		PROMETHEUS_URL=http://localhost:9090 ALERTMANAGER_URL=http://localhost:9093 \
 		./obs-mcp --listen $(LISTEN_ADDR) --auth-mode header --log-level $(LOG_LEVEL)
 
+.PHONY: inspect
+inspect: ## Start obs-mcp + MCP Inspector via podman compose (port-forward Prometheus/Alertmanager first)
+	podman compose -f podman-compose.yaml up --build
 
 .PHONY: run-no-guardrails
 run-no-guardrails: build ## Run obs-mcp in HTTP mode with guardrails disabled
