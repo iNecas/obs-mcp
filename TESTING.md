@@ -109,7 +109,6 @@ Validates that AI agents can discover and correctly use obs-mcp tools. See [`eva
 Quick start:
 
 ```bash
-make install-mcpchecker                     # install mcpchecker CLI
 make run-mcpchecker-eval                    # run all tasks in parallel
 make run-mcpchecker-eval CATEGORY=queries    # run by category (metrics, labels, queries, alerts)
 make run-mcpchecker-eval TASK=cpu-usage     # single task, verbose

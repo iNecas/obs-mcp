@@ -251,8 +251,54 @@ config:
         minToolCalls: 3
         maxToolCalls: 15
 
+    # Multi-step reasoning (hard)
+    - path: tasks/queries/namespace-pod-count.yaml
+      assertions:
+        toolsUsed:
+          - server: obs
+            tool: list_metrics
+          - server: obs
+            toolPattern: "(execute_instant_query|execute_range_query|get_label_values)"
+        callOrder:
+          - type: tool
+            server: obs
+            name: list_metrics
+        minToolCalls: 2
+        maxToolCalls: 15
+
     # Ambiguous diagnostic (hard)
     - path: tasks/queries/diagnose-cluster-health.yaml
       assertions:
         minToolCalls: 3
         maxToolCalls: 20
+
+    # Error handling
+    - path: tasks/queries/nonexistent-metric.yaml
+      assertions:
+        toolsUsed:
+          - server: obs
+            tool: list_metrics
+        minToolCalls: 1
+        maxToolCalls: 5
+
+    - path: tasks/queries/nonexistent-namespace.yaml
+      assertions:
+        toolsUsed:
+          - server: obs
+            tool: list_metrics
+          - server: obs
+            toolPattern: "(execute_instant_query|execute_range_query)"
+        callOrder:
+          - type: tool
+            server: obs
+            name: list_metrics
+        minToolCalls: 2
+        maxToolCalls: 10
+
+    - path: tasks/queries/high-cardinality-rejection.yaml
+      assertions:
+        toolsUsed:
+          - server: obs
+            tool: list_metrics
+        minToolCalls: 1
+        maxToolCalls: 15
