@@ -257,7 +257,7 @@ config:
           - type: tool
             server: obs
             name: list_metrics
-        minToolCalls: 3
+        minToolCalls: 2
         maxToolCalls: 15
 
     # Multi-step reasoning (hard)
@@ -278,8 +278,29 @@ config:
     # Ambiguous diagnostic (hard)
     - path: tasks/queries/diagnose-cluster-health.yaml
       assertions:
+        toolsUsed:
+          - server: obs
+            tool: list_metrics
         minToolCalls: 3
         maxToolCalls: 20
+
+    # Visualization
+    - path: tasks/queries/visualize-cpu-usage.yaml
+      assertions:
+        toolsUsed:
+          - server: obs
+            tool: list_metrics
+          - server: obs
+            tool: show_timeseries
+        callOrder:
+          - type: tool
+            server: obs
+            name: list_metrics
+          - type: tool
+            server: obs
+            name: show_timeseries
+        minToolCalls: 2
+        maxToolCalls: 10
 
     # Time range precision
     - path: tasks/queries/time-range-query.yaml
@@ -327,5 +348,7 @@ config:
         toolsUsed:
           - server: obs
             tool: list_metrics
-        minToolCalls: 1
+          - server: obs
+            toolPattern: "(execute_instant_query|execute_range_query)"
+        minToolCalls: 2
         maxToolCalls: 15

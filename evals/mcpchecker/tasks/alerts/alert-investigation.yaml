@@ -4,7 +4,7 @@ metadata:
   name: "alert-investigation"
   difficulty: medium
   parallel: true
-  runs: 3
+  runs: 1
   labels:
     category: alerts
     toolType: multi-step

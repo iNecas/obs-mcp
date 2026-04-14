@@ -4,7 +4,7 @@ metadata:
   name: "time-range-query"
   difficulty: medium
   parallel: true
-  runs: 3
+  runs: 1
   labels:
     category: queries
     toolType: multi-step

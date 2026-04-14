@@ -4,7 +4,7 @@ metadata:
   name: "get-silences"
   difficulty: easy
   parallel: true
-  runs: 2
+  runs: 1
   labels:
     category: alerts
     toolType: alertmanager

@@ -4,7 +4,7 @@ metadata:
   name: "network-traffic"
   difficulty: medium
   parallel: true
-  runs: 3
+  runs: 1
   labels:
     category: queries
     toolType: query

@@ -58,9 +58,11 @@ make run-mcpchecker-eval TASK=prometheus-reachability
 From the repo root using Makefile targets:
 
 ```bash
-make run-mcpchecker-eval                    # all tasks in parallel
-make run-mcpchecker-eval CATEGORY=metrics   # run by category (metrics, labels, queries, alerts)
-make run-mcpchecker-eval TASK=cpu-usage     # single task, verbose
+make run-mcpchecker-eval                          # all tasks in parallel (1 run each)
+make run-mcpchecker-eval CATEGORY=metrics         # run by category (metrics, labels, queries, alerts)
+make run-mcpchecker-eval TASK=cpu-usage            # single task, verbose
+make run-mcpchecker-eval RUNS=3                    # all tasks, 3 runs each for consistency testing
+make run-mcpchecker-eval CATEGORY=alerts RUNS=3    # category with multiple runs
 ```
 
 Or directly:
@@ -82,28 +84,26 @@ Override the MCP config file (e.g., to point at a different obs-mcp instance):
 mcpchecker check eval.yaml --mcp-config-file /path/to/other-mcp-config.yaml
 ```
 
-Tasks with `runs` configured will automatically execute multiple times for consistency testing. To override the run count for all tasks:
+The Makefile defaults to `RUNS=1`. Override with `RUNS=N` for consistency testing:
 
 ```bash
-mcpchecker check eval.yaml --parallel 4 --runs 5
+make run-mcpchecker-eval TASK=cpu-usage RUNS=3
 ```
 
 ### Running a Single Task
 
-Use `-r / --run` to filter tasks by name (regex, like `go test -run`):
+Use `TASK` to filter by name or `CATEGORY` to filter by category:
 
 ```bash
-# Run only the cpu-usage task
-mcpchecker check eval.yaml --run "cpu-usage"
+make run-mcpchecker-eval TASK=cpu-usage            # single task, verbose
+make run-mcpchecker-eval TASK="alert|silence"       # regex match
+make run-mcpchecker-eval CATEGORY=alerts            # all alert tasks
+```
 
-# Single run (overrides the task's configured runs: 3)
-mcpchecker check eval.yaml --run "cpu-usage" --runs 1
+Or directly with `mcpchecker`:
 
-# Run all alert-related tasks
-mcpchecker check eval.yaml --run "alert|silence"
-
-# Verbose output to see tool calls
-mcpchecker check eval.yaml --run "cpu-usage" --runs 1 --verbose
+```bash
+mcpchecker check eval.yaml --run "cpu-usage" --verbose
 ```
 
 Use `-l / --label-selector` to filter by task labels:
@@ -211,7 +211,7 @@ metadata:
   name: "my-new-task"
   difficulty: medium
   parallel: true
-  runs: 3
+  runs: 1
   labels:
     category: queries
     toolType: instant-query
@@ -226,3 +226,5 @@ spec:
 ```
 
 Then add a corresponding `taskSet` entry in `eval.yaml` pointing to the new file.
+
+> **TODO:** All tasks currently use `runs: 1` to reduce token cost while iterating. Once evals are stable, bump to `runs: 3` for consistency testing.

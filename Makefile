@@ -186,15 +186,16 @@ $(TOOLS_BIN_DIR)/mcpchecker: | $(TOOLS_BIN_DIR)
 install-mcpchecker: $(TOOLS_BIN_DIR)/mcpchecker ## Install mcpchecker CLI for running evals
 
 MCPCHECKER_EVAL_DIR := evals/mcpchecker
+RUNS ?= 1
 
 .PHONY: run-mcpchecker-eval
-run-mcpchecker-eval: $(TOOLS_BIN_DIR)/mcpchecker ## Run mcpchecker eval (TASK=name for single task, CATEGORY=queries for category, omit for all)
+run-mcpchecker-eval: $(TOOLS_BIN_DIR)/mcpchecker ## Run mcpchecker eval (TASK=name, CATEGORY=queries, RUNS=3 for consistency testing)
 ifdef TASK
-	cd $(MCPCHECKER_EVAL_DIR) && $(TOOLS_BIN_DIR)/mcpchecker check eval.yaml --run "$(TASK)" --runs 1 --verbose
+	cd $(MCPCHECKER_EVAL_DIR) && $(TOOLS_BIN_DIR)/mcpchecker check eval.yaml --run "$(TASK)" --runs $(RUNS) --verbose
 else ifdef CATEGORY
-	cd $(MCPCHECKER_EVAL_DIR) && $(TOOLS_BIN_DIR)/mcpchecker check eval.yaml --label-selector "category=$(CATEGORY)" --parallel 4
+	cd $(MCPCHECKER_EVAL_DIR) && $(TOOLS_BIN_DIR)/mcpchecker check eval.yaml --label-selector "category=$(CATEGORY)" --runs $(RUNS) --parallel 4
 else
-	cd $(MCPCHECKER_EVAL_DIR) && $(TOOLS_BIN_DIR)/mcpchecker check eval.yaml --parallel 4
+	cd $(MCPCHECKER_EVAL_DIR) && $(TOOLS_BIN_DIR)/mcpchecker check eval.yaml --runs $(RUNS) --parallel 4
 endif
 
 .PHONY: deploy-kube-state-metrics

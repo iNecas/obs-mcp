@@ -4,7 +4,7 @@ metadata:
   name: "label-names"
   difficulty: easy
   parallel: true
-  runs: 2
+  runs: 1
   labels:
     category: labels
     toolType: exploration

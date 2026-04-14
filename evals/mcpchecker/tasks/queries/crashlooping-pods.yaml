@@ -4,7 +4,7 @@ metadata:
   name: "crashlooping-pods"
   difficulty: medium
   parallel: true
-  runs: 3
+  runs: 1
   labels:
     category: queries
     toolType: range-query
