@@ -4,9 +4,9 @@ Evaluations for obs-mcp using [mcpchecker](https://github.com/mcpchecker/mcpchec
 
 ## Pre-requisites
 
-- [mcpchecker](https://github.com/mcpchecker/mcpchecker#install) installed (v0.0.15+)
-- A Kubernetes cluster with Prometheus and Alertmanager running
-- obs-mcp server deployed and accessible (see [Testing Guide — MCPChecker Evals](../../TESTING.md#mcpchecker-evals))
+- [mcpchecker](https://github.com/mcpchecker/mcpchecker#install) installed (v0.0.15+) — run `make install-mcpchecker` from the repo root
+- A Kubernetes/OpenShift cluster with Prometheus and Alertmanager running
+- obs-mcp server deployed and accessible (see [Backend Setup](#backend-setup))
 
 ## Environment Variables
 
@@ -31,15 +31,13 @@ For Anthropic, Gemini, or custom endpoints, see [Using a Different Agent](#using
 
 ## Quick Start
 
-### 1. Ensure obs-mcp is running
-
-Port-forward to the obs-mcp service:
+### 1. Start obs-mcp locally
 
 ```bash
-kubectl port-forward -n obs-mcp svc/obs-mcp 9100:9100
+make run
 ```
 
-Or if running elsewhere, update `mcp-config.yaml` with the correct URL.
+This uses the default `kubeconfig` auth mode with route auto-discovery. See [Backend Setup](#backend-setup) for other options (Kind cluster, OpenShift). Update `mcp-config.yaml` if obs-mcp is not at `http://localhost:9100/mcp`.
 
 ### 2. Set environment variables
 
@@ -48,6 +46,15 @@ export OPENAI_API_KEY="sk-..."   # used by both agent and LLM judge
 ```
 
 ### 3. Run the evals
+
+From the repo root using Makefile targets:
+
+```bash
+make run-mcpchecker-eval                    # all tasks in parallel
+make run-mcpchecker-eval TASK=cpu-usage     # single task, verbose
+```
+
+Or directly:
 
 ```bash
 cd evals/mcpchecker
@@ -112,78 +119,77 @@ Compare results between runs:
 mcpchecker diff baseline-out.json current-out.json
 ```
 
-## Using a Different Agent
+## Backend Setup
 
-By default, the evals use `builtin.llm-agent` with `openai:gpt-5-nano`. To use a different provider or model, edit the `agent` and `llmJudge.ref` sections in `eval.yaml`. The multi-provider `llm-agent` supports `provider:model-id` format:
+### Kind cluster — obs-mcp deployed in-cluster
 
-```yaml
-# eval.yaml
-config:
-  agent:
-    type: "builtin.llm-agent"
-    model: "anthropic:claude-3-haiku-20240307"
-  llmJudge:
-    ref:
-      type: builtin.llm-agent
-      model: "anthropic:claude-3-haiku-20240307"
-```
-
-Supported providers: `openai`, `anthropic`, `gemini`, `google` (Vertex AI). Set the corresponding environment variable:
+Reuses the e2e setup:
 
 ```bash
-# Anthropic
-export ANTHROPIC_API_KEY="sk-ant-..."
+make test-e2e-setup                        # create Kind cluster with kube-prometheus
+make deploy-more-kube-prom-targets         # deploy kube-state-metrics, node-exporter, kubelet scrape configs
+make test-e2e-deploy                       # build and deploy obs-mcp
+kubectl port-forward -n obs-mcp svc/obs-mcp 9100:9100 &
 
-# Gemini
-export GEMINI_API_KEY="..."
+export OPENAI_API_KEY="sk-..."
 
-# Gemini via Vertex AI
-export GEMINI_USE_VERTEX=1
-export GOOGLE_CLOUD_PROJECT="your-project"
-export GOOGLE_CLOUD_LOCATION="us-central1"
+make run-mcpchecker-eval                   # run all tasks in parallel
+make run-mcpchecker-eval TASK=cpu-usage    # single task, verbose
 ```
 
-See the [mcpchecker agent docs](https://github.com/mcpchecker/mcpchecker/blob/main/docs/how-to/configure-agents.md) for all agent types and configuration options.
+### Kind cluster — obs-mcp running locally
 
-## Coverage
+```bash
+make test-e2e-setup                        # create Kind cluster with kube-prometheus (skip if already running)
+make deploy-more-kube-prom-targets         # deploy kube-state-metrics, node-exporter, kubelet scrape configs
+kubectl port-forward -n monitoring svc/prometheus-k8s 9090:9090 &
+kubectl port-forward -n monitoring svc/alertmanager-main 9093:9093 &
+PROMETHEUS_URL=http://localhost:9090 ALERTMANAGER_URL=http://localhost:9093 AUTH_MODE=header make run
 
-17 eval tasks across 4 categories and 3 difficulty levels:
+# In another terminal:
+export OPENAI_API_KEY="sk-..."
 
-| Category          | Tasks                                                                                                                  | Difficulty | Tools Tested                                        |
-|-------------------|------------------------------------------------------------------------------------------------------------------------|------------|-----------------------------------------------------|
-| Metrics discovery | list kube metrics, list node metrics                                                                                   | easy       | `list_metrics`                                      |
-| Label exploration | label names, label values, series cardinality                                                                          | easy-medium | `get_label_names`, `get_label_values`, `get_series` |
-| PromQL queries    | CPU usage, pending pods, crashlooping pods, pods created, network traffic, Prometheus internals (head series, requests, WAL size) | easy-medium | `execute_instant_query`, `execute_range_query`      |
-| Multi-step queries | namespace resource usage, cluster health diagnosis                                                                    | hard       | Multiple tools chained together                     |
-| Alertmanager      | firing alerts, alert investigation, silences                                                                           | easy-medium | `get_alerts`, `get_silences`                        |
+make run-mcpchecker-eval                   # all tasks
+make run-mcpchecker-eval TASK=cpu-usage    # single task, verbose
+```
 
-Each task verifies:
+### OpenShift
 
-- The agent selects the correct tool(s)
-- Tool call count stays within bounds
-- Tool call order follows the mandatory `list_metrics`-first workflow (via `callOrder`)
-- Response contains expected content (via LLM judge with specific metric name checks)
-- Consistency across multiple runs (via `runs` metadata)
+Start obs-mcp locally in one terminal, run evals in another:
 
-All tasks include `labels` for filtering with `labelSelector`:
-- `category`: `metrics`, `labels`, `queries`, `alerts`
-- `toolType`: `discovery`, `exploration`, `instant-query`, `range-query`, `alertmanager`, `multi-step`, `diagnostic`
+```bash
+make run                          # via route auto-discovery
+# or
+make run-openshift-pf-prometheus  # via port-forward
+```
 
-> **Note:** Areas for future improvement:
->
-> - **Error handling** — agent recovery from invalid queries or missing metrics
-> - **Guardrail behavior** — agent response when dangerous queries are blocked (use [`toolsNotUsed`](https://github.com/mcpchecker/mcpchecker/blob/main/docs/how-to/use-assertions.md#forbidden-tools) to enforce)
-> - **Redundancy checks** — use [`noDuplicateCalls`](https://github.com/mcpchecker/mcpchecker/blob/main/docs/how-to/use-assertions.md#no-duplicate-calls) for simple tasks
-> - **Parameter coverage** — testing less-used params like `silenced`, `inhibited`, `receiver`, `filter`, time ranges
+```bash
+export OPENAI_API_KEY="sk-..."
+
+make run-mcpchecker-eval                   # all tasks
+make run-mcpchecker-eval TASK=cpu-usage    # single task, verbose
+```
+
+Update `mcp-config.yaml` if obs-mcp is not at `http://localhost:9100/mcp`.
+
+> **Note:** Once the obs-mcp container image is published or you build one yourself, evals can also run against an in-cluster deployment on OpenShift via `kubectl port-forward -n obs-mcp svc/obs-mcp 9100:9100`.
+
+## Using a Different Agent
+
+By default, the evals use `builtin.llm-agent` with `openai:gpt-5-nano`. To use a different provider or model, edit the `agent` and `llmJudge.ref` sections in `eval.yaml`. See the [mcpchecker agent docs](https://github.com/mcpchecker/mcpchecker/blob/main/docs/how-to/configure-agents.md) for all supported providers and configuration options.
 
 ## Task Structure
 
-| Directory          | Description                              | Tools Tested                                        |
-|--------------------|------------------------------------------|-----------------------------------------------------|
-| `tasks/metrics/`   | Metric discovery and listing             | `list_metrics`                                      |
-| `tasks/labels/`    | Label names, values, and series          | `get_label_names`, `get_label_values`, `get_series` |
-| `tasks/queries/`   | PromQL queries and multi-step diagnostics | `execute_instant_query`, `execute_range_query`      |
-| `tasks/alerts/`    | Alertmanager alerts, investigation, silences | `get_alerts`, `get_silences`                     |
+Tasks are organized by category under `tasks/`:
+
+| Directory          | Description                                  |
+|--------------------|----------------------------------------------|
+| `tasks/metrics/`   | Metric discovery and listing                 |
+| `tasks/labels/`    | Label names, values, and series              |
+| `tasks/queries/`   | PromQL queries and multi-step diagnostics    |
+| `tasks/alerts/`    | Alertmanager alerts, investigation, silences |
+
+Each task YAML defines the prompt, expected tools, call bounds, and LLM judge criteria. All tasks include `labels` for filtering with `--label-selector` (e.g. `category=metrics`, `category=alerts`).
 
 ## Adding New Tasks
 

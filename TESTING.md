@@ -104,63 +104,12 @@ OBS_MCP_URL=http://localhost:9100 make test-e2e             # full MCP tool smok
 
 ## MCPChecker Evals
 
-Validates that AI agents can discover and correctly use obs-mcp tools. Requires [mcpchecker](https://github.com/mcpchecker/mcpchecker#installation) and an LLM API key. See [`evals/mcpchecker/README.md`](evals/mcpchecker/README.md) for full setup.
+Validates that AI agents can discover and correctly use obs-mcp tools. See [`evals/mcpchecker/README.md`](evals/mcpchecker/README.md) for installation, environment setup, and detailed usage.
 
-**Against a Kind cluster — Option 1: obs-mcp deployed in-cluster** (reuses the e2e setup):
-
-```bash
-make test-e2e-setup              # create Kind cluster with kube-prometheus
-make deploy-more-kube-prom-targets        # deploy kube-state-metrics, node-exporter, kubelet scrape configs
-make test-e2e-deploy             # build and deploy obs-mcp
-kubectl port-forward -n obs-mcp svc/obs-mcp 9100:9100 &
-
-export OPENAI_API_KEY="sk-..."
-export JUDGE_BASE_URL="https://api.openai.com/v1"
-export JUDGE_API_KEY="sk-..."
-export JUDGE_MODEL_NAME="gpt-4o-mini"   # Model to use as judge
-
-cd evals/mcpchecker
-mcpchecker check eval.yaml --parallel 4
-mcpchecker check eval.yaml --run "cpu-usage" --runs 1 --verbose  # single task, verbose
-```
-
-**Against a Kind cluster — Option 2: obs-mcp running locally**:
+Quick start:
 
 ```bash
-make test-e2e-setup              # create Kind cluster with kube-prometheus (skip if already running)
-make deploy-more-kube-prom-targets        # deploy kube-state-metrics, node-exporter, kubelet scrape configs
-kubectl port-forward -n monitoring svc/prometheus-k8s 9090:9090 &
-kubectl port-forward -n monitoring svc/alertmanager-main 9093:9093 &
-PROMETHEUS_URL=http://localhost:9090 ALERTMANAGER_URL=http://localhost:9093 AUTH_MODE=header make run
-
-# In another terminal:
-export OPENAI_API_KEY="sk-..."
-export JUDGE_BASE_URL="https://api.openai.com/v1"
-export JUDGE_API_KEY="sk-..."
-export JUDGE_MODEL_NAME="gpt-4o-mini"   # Model to use as judge
-
-cd evals/mcpchecker
-mcpchecker check eval.yaml --parallel 4
+make install-mcpchecker                     # install mcpchecker CLI
+make run-mcpchecker-eval                    # run all tasks in parallel
+make run-mcpchecker-eval TASK=cpu-usage     # single task, verbose
 ```
-
-**Against OpenShift** — start obs-mcp locally in one terminal, run evals in another:
-
-```bash
-make run                          # via route auto-discovery
-# or
-make run-openshift-pf-prometheus  # via port-forward
-```
-
-```bash
-export OPENAI_API_KEY="sk-..."
-export JUDGE_BASE_URL="https://api.openai.com/v1"
-export JUDGE_API_KEY="sk-..."
-export JUDGE_MODEL_NAME="gpt-4o-mini"   # Model to use as judge
-
-cd evals/mcpchecker
-mcpchecker check eval.yaml --parallel 4
-```
-
-Update `mcp-config.yaml` if obs-mcp is not at `http://localhost:9100/mcp`.
-
-> **Note:** Once the obs-mcp container image is published or you build one yourself, evals can also run against an in-cluster deployment on OpenShift via `kubectl port-forward -n obs-mcp svc/obs-mcp 9100:9100`.
