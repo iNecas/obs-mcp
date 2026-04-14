@@ -51,6 +51,7 @@ From the repo root using Makefile targets:
 
 ```bash
 make run-mcpchecker-eval                    # all tasks in parallel
+make run-mcpchecker-eval CATEGORY=metrics   # run by category (metrics, labels, queries, alerts)
 make run-mcpchecker-eval TASK=cpu-usage     # single task, verbose
 ```
 

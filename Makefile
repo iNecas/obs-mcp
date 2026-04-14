@@ -188,9 +188,11 @@ install-mcpchecker: $(TOOLS_BIN_DIR)/mcpchecker ## Install mcpchecker CLI for ru
 MCPCHECKER_EVAL_DIR := evals/mcpchecker
 
 .PHONY: run-mcpchecker-eval
-run-mcpchecker-eval: $(TOOLS_BIN_DIR)/mcpchecker ## Run mcpchecker eval (TASK=cpu-usage for single task, omit for all)
+run-mcpchecker-eval: $(TOOLS_BIN_DIR)/mcpchecker ## Run mcpchecker eval (TASK=name for single task, CATEGORY=queries for category, omit for all)
 ifdef TASK
 	cd $(MCPCHECKER_EVAL_DIR) && $(TOOLS_BIN_DIR)/mcpchecker check eval.yaml --run "$(TASK)" --runs 1 --verbose
+else ifdef CATEGORY
+	cd $(MCPCHECKER_EVAL_DIR) && $(TOOLS_BIN_DIR)/mcpchecker check eval.yaml --label-selector "category=$(CATEGORY)" --parallel 4
 else
 	cd $(MCPCHECKER_EVAL_DIR) && $(TOOLS_BIN_DIR)/mcpchecker check eval.yaml --parallel 4
 endif
