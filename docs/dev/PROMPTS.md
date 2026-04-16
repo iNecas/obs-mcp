@@ -1,6 +1,6 @@
 # Prompts You Can Try
 
-This document lists example prompts you can use to test obs-mcp when connected to Cursor or another MCP client. These prompts align with the [MCPChecker evals](../evals/mcpchecker/) and exercise different obs-mcp tools.
+This document lists example prompts you can use to test obs-mcp when connected to Cursor or another MCP client. These prompts align with the [MCPChecker evals](../../evals/mcpchecker/) and exercise different obs-mcp tools.
 
 For metric discovery tips (e.g. regex behavior, common question → metric mapping), see [METRICS_REFERENCE.md](./METRICS_REFERENCE.md).
 
