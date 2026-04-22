@@ -16,11 +16,11 @@ metadata:
 spec:
   verify:
     - llmJudge:
-        contains: "cluster"
-        reason: "Verify the response provides an overall cluster health assessment"
+        contains: "alertname"
+        reason: "Verify the agent checked alerts and reported specific alert names or confirmed none are firing"
     - llmJudge:
-        contains: "node"
-        reason: "Verify the agent checked node-level health indicators"
+        contains: "kube_"
+        reason: "Verify the agent queried Kubernetes metrics (e.g. kube_node_status_condition) for health assessment"
   prompt:
     inline: |
       Is the cluster healthy? Give me an overview of any issues.

@@ -15,7 +15,7 @@ spec:
   verify:
     - llmJudge:
         contains: "silence"
-        reason: "Verify the output discusses alert silences, including when no active silences exist"
+        reason: "Verify the agent called get_silences and reported the result — either listing active silences with their matchers, or confirming no silences exist"
   prompt:
     inline: |
       Are there any active silences in Alertmanager?

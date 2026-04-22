@@ -15,11 +15,11 @@ metadata:
 spec:
   verify:
     - llmJudge:
-        contains: "alert"
-        reason: "Verify the agent retrieved alerts from Alertmanager"
+        contains: "alertname"
+        reason: "Verify the agent retrieved alerts and reported specific alert names from Alertmanager"
     - llmJudge:
-        contains: "metric"
-        reason: "Verify the agent investigated a related Prometheus metric"
+        contains: "query"
+        reason: "Verify the agent investigated related metrics by running a Prometheus query"
   prompt:
     inline: |
       Check if there are any firing alerts. If there are, investigate
