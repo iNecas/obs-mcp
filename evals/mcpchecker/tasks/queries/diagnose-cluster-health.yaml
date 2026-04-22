@@ -16,8 +16,8 @@ metadata:
 spec:
   verify:
     - llmJudge:
-        contains: "alertname"
-        reason: "Verify the agent checked alerts and reported specific alert names or confirmed none are firing"
+        contains: "Watchdog"
+        reason: "Verify the agent checked alerts and reported specific alert names such as Watchdog"
     - llmJudge:
         contains: "kube_"
         reason: "Verify the agent queried Kubernetes metrics (e.g. kube_node_status_condition) for health assessment"
