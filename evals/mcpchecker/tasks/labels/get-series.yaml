@@ -22,4 +22,4 @@ spec:
         reason: "Verify the agent queried the kube_pod_info metric and reported its cardinality"
   prompt:
     inline: |
-      How many time series exist for the kube_pod_info metric? Show the cardinality.
+      How many time series exist for the kube_pod_info metric? Show the count and list the label names present.
