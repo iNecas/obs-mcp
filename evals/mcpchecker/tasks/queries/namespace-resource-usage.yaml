@@ -16,14 +16,11 @@ metadata:
 spec:
   verify:
     - llmJudge:
-        contains: "namespace"
-        reason: "Verify the response breaks down resource usage by namespace"
+        contains: "container_cpu_usage_seconds_total"
+        reason: "Verify the agent discovered and used the correct CPU metric"
     - llmJudge:
-        contains: "cpu"
-        reason: "Verify the response includes CPU usage data"
-    - llmJudge:
-        contains: "memory"
-        reason: "Verify the response includes memory usage data"
+        contains: "container_memory"
+        reason: "Verify the agent discovered and used a container memory metric (working_set_bytes or usage_bytes)"
   prompt:
     inline: |
       Which namespace is consuming the most CPU and memory?

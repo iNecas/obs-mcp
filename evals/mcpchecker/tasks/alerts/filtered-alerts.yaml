@@ -16,11 +16,8 @@ metadata:
 spec:
   verify:
     - llmJudge:
-        contains: "alert"
-        reason: "Verify the agent retrieved and reported on alerts"
-    - llmJudge:
-        contains: "critical"
-        reason: "Verify the agent filtered or addressed the critical severity"
+        contains: "AlertmanagerReceiversNotConfigured"
+        reason: "Verify the agent filtered for warning-severity alerts and found AlertmanagerReceiversNotConfigured"
   prompt:
     inline: |
-      Are there any firing alerts with severity=critical? Show only active alerts.
+      Show me only the active alerts with severity=warning.
