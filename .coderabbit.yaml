@@ -1,0 +1,34 @@
+inheritance: true
+reviews:
+  high_level_summary: false
+  high_level_summary_in_walkthrough: true
+  sequence_diagrams: false
+  collapse_walkthrough: true
+  changed_files_summary: false
+  poem: false
+  path_instructions:
+    - path: '**'
+      instructions: >-
+        Focus on major issues impacting performance, readability, maintainability and security.
+        Avoid nitpicks and avoid verbosity.
+    - path: 'evals/**'
+      instructions: >-
+        These are mcpchecker eval task definitions. Only flag issues with YAML structure,
+        missing required fields, or clearly incorrect prompt/assertion logic.
+        Do not suggest stylistic changes to prompts or reason strings.
+    - path: 'docs/**'
+      instructions: >-
+        Only flag factual inaccuracies or broken links. Skip grammar and style suggestions.
+    - path: 'manifests/**'
+      instructions: >-
+        Focus on correctness of Kubernetes resource definitions, RBAC permissions,
+        and container security context. Skip formatting nitpicks.
+  auto_review:
+    ignore_title_keywords:
+      - WIP
+    labels:
+      - '!work-in-progress'
+knowledge_base:
+  opt_out: true
+  web_search:
+    enabled: false
