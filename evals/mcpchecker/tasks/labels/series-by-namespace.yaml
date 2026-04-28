@@ -7,6 +7,7 @@ metadata:
   runs: 1
   labels:
     category: labels
+    suite: observability
     toolType: exploration
   description: |
     Tests if the agent can use the get_series tool with a label selector
@@ -24,4 +25,5 @@ spec:
   prompt:
     inline: |
       How many time series exist for container_cpu_usage_seconds_total
-      in the openshift-monitoring namespace?
+      in the openshift-monitoring namespace? List the label dimensions
+      (such as pod, container) present in the series.

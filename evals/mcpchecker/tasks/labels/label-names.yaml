@@ -7,6 +7,7 @@ metadata:
   runs: 1
   labels:
     category: labels
+    suite: observability
     toolType: exploration
   description: |
     Tests if the agent follows the correct workflow: first calling list_metrics to

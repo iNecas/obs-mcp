@@ -7,6 +7,7 @@ metadata:
   runs: 1
   labels:
     category: queries
+    suite: observability
     toolType: range-query
   description: |
     Tests if the agent can identify crashlooping pods by discovering and querying
@@ -19,3 +20,4 @@ spec:
   prompt:
     inline: |
       Which pods were crashlooping in the last 5 minutes?
+      Use Prometheus metrics and include the metric name and PromQL query you used.
