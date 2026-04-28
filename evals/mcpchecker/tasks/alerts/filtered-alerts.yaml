@@ -7,6 +7,7 @@ metadata:
   runs: 1
   labels:
     category: alerts
+    suite: observability
     toolType: alertmanager
   description: |
     Tests if the agent uses the get_alerts tool with filter parameters

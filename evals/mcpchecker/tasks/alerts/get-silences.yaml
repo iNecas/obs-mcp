@@ -7,6 +7,7 @@ metadata:
   runs: 1
   labels:
     category: alerts
+    suite: observability
     toolType: alertmanager
   description: |
     Tests if the agent can discover and use the get_silences tool to retrieve

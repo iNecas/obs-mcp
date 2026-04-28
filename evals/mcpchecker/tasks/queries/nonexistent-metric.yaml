@@ -7,6 +7,7 @@ metadata:
   runs: 1
   labels:
     category: queries
+    suite: observability
     toolType: error-handling
   description: |
     Tests agent recovery when querying a metric that does not exist.

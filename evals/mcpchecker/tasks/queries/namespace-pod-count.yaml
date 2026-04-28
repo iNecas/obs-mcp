@@ -7,6 +7,7 @@ metadata:
   runs: 1
   labels:
     category: queries
+    suite: observability
     toolType: multi-step
   description: |
     Tests multi-step reasoning: the agent must discover a suitable metric
@@ -24,3 +25,4 @@ spec:
   prompt:
     inline: |
       Which namespaces have the most running pods? Show me the top 5.
+      Use Prometheus metrics and include the metric name and PromQL query you used.

@@ -7,6 +7,7 @@ metadata:
   runs: 1
   labels:
     category: queries
+    suite: observability
     toolType: multi-step
   description: |
     Tests multi-step reasoning: the agent must discover CPU and memory metrics,
@@ -25,3 +26,4 @@ spec:
     inline: |
       Which namespace is consuming the most CPU and memory?
       Show me the top namespace for each.
+      Use Prometheus metrics and include the metric names and PromQL queries you used.
