@@ -10,6 +10,9 @@ reviews:
   collapse_walkthrough: true
   changed_files_summary: false
   poem: false
+  pre_merge_checks:
+    docstrings:
+      mode: off
   path_instructions:
     - path: '**'
       instructions: >-
