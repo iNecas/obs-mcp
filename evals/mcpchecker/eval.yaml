@@ -393,7 +393,7 @@ config:
             tool: list_metrics
           - server: obs
             toolPattern: "(execute_instant_query|execute_range_query)"
-        minToolCalls: 2
+        minToolCalls: 0
         maxToolCalls: 15
 
     # Traces
