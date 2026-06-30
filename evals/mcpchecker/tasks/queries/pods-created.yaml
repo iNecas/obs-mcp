@@ -11,11 +11,11 @@ metadata:
     toolType: range-query
   description: |
     Tests if the agent can use a range query to find recently created pods by
-    discovering the kube_pod_created metric and querying it over a 5-minute window.
+    discovering the kube_pod_start_time metric and querying it over a 5-minute window.
 spec:
   verify:
     - llmJudge:
-        contains: "kube_pod_created"
+        contains: "kube_pod_start_time"
   prompt:
     inline: |
       How many pods were created in the last 5 minutes?
